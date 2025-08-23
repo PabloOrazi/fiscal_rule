@@ -4,36 +4,36 @@ import numpy as np
 from math import log
 import matplotlib.pyplot as plt
 
-st.set_page_config(layout="wide", page_title="Fiscal Rule Calculator")
+st.set_page_config(layout="wide", page_title="Calculadora de Regla Fiscal")
 
-st.markdown("<h2 style='font-size:1.5em;'>Fiscal Rule — Primary Balance Decomposition</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='font-size:1.5em;'>Regla Fiscal — Descomposición del Balance Primario</h2>", unsafe_allow_html=True)
 
-# Sidebar inputs
-st.sidebar.header("Debt Stock Inputs")
+# Entradas de la barra lateral
+st.sidebar.header("Entradas de Stock de Deuda")
 # 67% 43.3% local
-d_dom = st.sidebar.number_input("Domestic debt (% of GDP)", value=29.0, step=0.5)
-d_fx = st.sidebar.number_input("Foreign debt (% of GDP)", value=38.0, step=0.5)
-d_star = st.sidebar.number_input("Debt anchor d* (% of GDP)", value=50.0, step=0.5)
+d_dom = st.sidebar.number_input("Deuda doméstica (% del PIB)", value=29.0, step=0.5)
+d_fx = st.sidebar.number_input("Deuda extranjera (% del PIB)", value=38.0, step=0.5)
+d_star = st.sidebar.number_input("Ancla de deuda d* (% del PIB)", value=50.0, step=0.5)
 
-st.sidebar.header("Fiscal Rule Parameters")
-tau = st.sidebar.number_input("Tau (fraction of excess to remove)", value=0.05, step=0.01)
-kappa = st.sidebar.number_input("Kappa (prudential FX Adjustment)", value=0.3, step=0.01)
+st.sidebar.header("Parámetros de la Regla Fiscal")
+tau = st.sidebar.number_input("Tau (fracción del exceso a remover)", value=0.05, step=0.01)
+kappa = st.sidebar.number_input("Kappa (ajuste prudencial FX)", value=0.3, step=0.01)
 
-st.sidebar.header("Interest Rates & Growth")
-r_dom = st.sidebar.number_input("Domestic real interest rate (r_dom)", value=4.0, step=0.1)
-r_fx = st.sidebar.number_input("FX real interest rate (r_fx)", value=4.0, step=0.1)
-n = st.sidebar.number_input("Real GDP growth (n)", value=3.0, step=0.1)
+st.sidebar.header("Tasas de Interés y Crecimiento")
+r_dom = st.sidebar.number_input("Tasa de interés real doméstica (r_dom)", value=4.0, step=0.1)
+r_fx = st.sidebar.number_input("Tasa de interés real FX (r_fx)", value=4.0, step=0.1)
+n = st.sidebar.number_input("Crecimiento real del PIB (n)", value=3.0, step=0.1)
 
-st.sidebar.header("Exchange Rate Inputs")
-E = st.sidebar.number_input("Current Real exchange rate (dom per FX)", value=1.00, step=0.01)
-E10 = st.sidebar.number_input("10-yr avg Real exchange rate", value=1.10, step=0.01)
+st.sidebar.header("Entradas de Tipo de Cambio")
+E = st.sidebar.number_input("Tipo de cambio real actual (dom por FX)", value=1.00, step=0.01)
+E10 = st.sidebar.number_input("Promedio 10 años tipo de cambio real", value=1.10, step=0.01)
 
-st.sidebar.header("Cyclical Adjustment")
-OG = st.sidebar.number_input("Output gap (OG)", value=0.0, step=0.1)
-epsilon_pb = st.sidebar.number_input("Epsilon (Tax/GDP elasticity)", value=0.5, step=0.1)
+st.sidebar.header("Ajuste Cíclico")
+OG = st.sidebar.number_input("Brecha de producto (OG)", value=0.0, step=0.1)
+epsilon_pb = st.sidebar.number_input("Epsilon (elasticidad impuestos/PIB)", value=0.5, step=0.1)
 
 
-# Core function
+# Función principal
 def compute_pb_req(params, include_convergence=True, include_fx_debt_risk=True,
                   r_dom_override=None, r_fx_override=None):
     d_dom = params["d_dom"]
@@ -50,7 +50,7 @@ def compute_pb_req(params, include_convergence=True, include_fx_debt_risk=True,
 
     undervaluation = np.log(E) - np.log(E10)
     fx_debt_risk = kappa * (-undervaluation) if include_fx_debt_risk else 0.0
-    d_target =  d_total - tau * (d_total - d_star)
+    d_target =  d_total - tau * max(d_total - d_star, 0)
 
     domestic_term = ((1 + r_dom/100) / (1 + n/100) ) * d_dom
     fx_term = (1 + r_fx/100) * (1 + fx_debt_risk) / (1 + n/100) * d_fx
@@ -64,7 +64,7 @@ params = {
     "OG": OG, "epsilon_pb": epsilon_pb
 }
 
-# Sequential decomposition
+# Descomposición secuencial
 base = compute_pb_req(params, include_convergence=True, include_fx_debt_risk=True,
                       r_dom_override=r_dom, r_fx_override=r_fx)
 step_dom = compute_pb_req(params, include_convergence=False, include_fx_debt_risk=False,
@@ -77,19 +77,22 @@ step_conv = compute_pb_req(params, include_convergence=True, include_fx_debt_ris
                            r_dom_override=n, r_fx_override=n)
 
 pb_structural = base[0]
-output_gap_effect = epsilon_pb * OG
+OG_over_3 = max(OG, 3) - 3
+OG_under_3 = min(OG, 3)
+epsilon_over_3 = 1.0
+output_gap_effect = epsilon_pb * OG_under_3 + OG_over_3 * epsilon_over_3
 pb_target = pb_structural + output_gap_effect
 
-# Contributions
+# Contribuciones
 contribs = pd.DataFrame({
     "component": [
-        "Target \nPrimary \nBalance",
-        "Fiscal \nStabilizer \nEffect (output \ngap)",
-        "Structural \nPrimary \nBalance \nTarget",
-        "Domestic \ninterest \neffect",
-        "Foreign \ninterest \neffect",
-        "FX \nvaluation \neffect \n(prudential)",
-        "Convergence \nto target \ndebt (tau \neffect)",
+        "Balance \nPrimario \nObjetivo",
+        "Efecto \nEstabilizador \nFiscal (brecha \nde producto)",
+        "Balance \nPrimario \nEstructural \nObjetivo",
+        "Efecto \nde interés \ndoméstico",
+        "Efecto \nde interés \nextranjero",
+        "Efecto \nde valoración \nFX (prudencial)",
+        "Convergencia \nal objetivo \nde deuda (efecto \ntau)",
     ],
     "contribution_pctGDP": [
         pb_target,
@@ -102,31 +105,31 @@ contribs = pd.DataFrame({
     ]
 })
 
-st.markdown("**Structural PB requirement (Output Gap=0):**")
+st.markdown("**Requisito estructural de balance primario (Brecha de producto=0):**")
 st.latex(r"""
 PB^{struct} = 
-\underbrace{\frac{(1+r_{dom})}{(1+g)} \cdot d_{dom}}_{\text{Domestic interest effect}}
+\underbrace{\frac{(1+r_{dom})}{(1+g)} \cdot d_{dom}}_{\text{Efecto interés doméstico}}
 \;+\;
-\underbrace{\frac{(1+r_{fx})}{(1+g)} \cdot d_{fx}}_{\text{Foreign interest effect}}
+\underbrace{\frac{(1+r_{fx})}{(1+g)} \cdot d_{fx}}_{\text{Efecto interés extranjero}}
 \;+\;
-\underbrace{\frac{(1+r_{fx})(FX_{Risk})}{(1+g)} \cdot d_{fx}}_{\text{FX Risk effect}}
+\underbrace{\frac{(1+r_{fx})(FX_{Risk})}{(1+g)} \cdot d_{fx}}_{\text{Efecto riesgo FX}}
 \;-\;
-\underbrace{\big[d - \tau(d - d^*)\big]}_{\text{Convergence to target debt}}
+\underbrace{\big[d - \tau(d - d^*)\big]}_{\text{Convergencia al objetivo de deuda}}
 """)
 
-st.markdown("**Target PB (with cyclical adjustment):**")
+st.markdown("**Balance primario objetivo (con ajuste cíclico):**")
 st.latex(r"""
 PB^{target} = PB^{struct} + \epsilon_{pb} \cdot OG
 """)
 
-# Plot
+# Gráfico
 fig, ax = plt.subplots(figsize=(7, 3.5))
 
-# make a list of colours by name
+# lista de colores por nombre
 colors = ["blue", "purple", "orange", "green", "red", "black",  "brown"]
 
 
-# Set custom bottom levels for each bar
+# Niveles inferiores personalizados para cada barra
 bottoms = [0, 
            contribs["contribution_pctGDP"][2], 
            0, 
@@ -137,22 +140,51 @@ bottoms = [0,
 ax.bar(contribs["component"], contribs["contribution_pctGDP"], color=colors, bottom=bottoms)
 ax.axhline(0, linewidth=0.6, color="black")
 
-# Make annotations above each bar of the value. Adjust by the bottoms
+# Anotaciones sobre cada barra con el valor. Ajustar por los bottoms
 for i, v in enumerate(contribs["contribution_pctGDP"]):
     ax.text(i, bottoms[i] + v + 0.1, f"{v:.2f}", ha="center", fontsize=8)
 
 plt.xticks(rotation=0, ha="center", fontsize=8)
-# Adjust the y-axis limits
+# Ajustar los límites del eje y
 ax.set_ylim(bottoms[0], contribs["contribution_pctGDP"].max() + 0.3)
-plt.ylabel("Contribution (% of GDP)")
-plt.title("Decomposition of Primary Balance Target")
+plt.ylabel("Contribución (% del PIB)")
+plt.title("Descomposición del Balance Primario Objetivo")
 plt.tight_layout()
 st.pyplot(fig)
 
-st.write("Structural primary balance required (OG=0):", round(pb_structural, 2), "% of GDP")
-st.write("Output-gap adjusted primary balance target:", round(pb_target, 2), "% of GDP")
+st.write("Balance primario estructural requerido (OG=0):", round(pb_structural, 2), "% del PIB")
+st.write("Balance primario objetivo ajustado por brecha de producto:", round(pb_target, 2), "% del PIB")
 
-# Display results
+# Mostrar resultados
 
-st.subheader("Decomposition")
+st.subheader("Descomposición")
 st.dataframe(contribs.round(2).set_index("component"))
+
+# Añadir una descripción del propósito de la regla
+st.subheader("Explicación")
+
+st.write("Esta regla tiene como objetivo reducir la deuda pública a un porcentaje del PIB, eliminando cada año una fracción (Tau) del exceso de deuda respecto al objetivo.")
+st.write("Por ejemplo, si la deuda pública es 70% del PIB y el objetivo es 50%, el exceso es 20%. Si Tau es 5%, se debería reducir 1% del PIB el próximo año (5% * 20%)."
+         " Esto implica que el superávit primario, después de considerar intereses y crecimiento, debe ser suficiente para lograr esa reducción.")
+st.write("La regla del superávit primario objetivo se basa en cinco componentes:")
+st.write("- Efecto de interés doméstico: Impacto de los intereses reales en moneda local sobre la deuda.")
+st.write("- Efecto de interés extranjero: Impacto de los intereses reales en moneda extranjera sobre la deuda.")
+st.write("- Efecto de valoración FX (prudencial): Ajuste por riesgo de corrección del tipo de cambio.")
+st.write("- Convergencia al objetivo de deuda (efecto tau): Reducción anual del exceso de deuda respecto al objetivo.")
+st.write("- Efecto estabilizador fiscal (brecha de producto): Ajuste del balance primario por el ciclo económico.")
+
+st.write("La suma de los primeros cuatro efectos determina el balance primario estructural requerido para alcanzar el objetivo de deuda. Al sumar el efecto estabilizador fiscal, se obtiene el balance primario objetivo.")
+
+st.write("El efecto de valoración FX (prudencial) refleja cómo las variaciones en el tipo de cambio afectan la deuda en moneda extranjera. El coeficiente Kappa indica el porcentaje del desvío del tipo de cambio real respecto al promedio de 10 años que se considera para el ajuste.")
+st.write("El efecto estabilizador fiscal (brecha de producto) muestra cómo el ciclo económico influye en el balance primario. El coeficiente Epsilon mide la sensibilidad del balance primario a la brecha de producto. En recesión, se tolera un menor superávit primario objetivo; en expansión, se exige uno mayor.")
+st.write("El efecto de la tasa de interés, tanto doméstica como extranjera, se calcula por la relación entre la tasa de interés real y el crecimiento real del PIB, multiplicado por la razón deuda/PIB.")
+st.write("La tasa de interés relevante para cada tipo de deuda es el promedio ponderado entre la tasa actual y la tasa histórica de la deuda emitida, según el porcentaje de vencimiento en el próximo año.")
+
+st.subheader("Cláusulas de Escape y Contingencias")
+
+st.write("- Recesiones económicas fuertes: Si el Output gap es menor a -3 puntos, el exceso se computa con un Epsilon de 100%. El producto potencial no puede superar el máximo producto histórico de los últimos 5 años.")
+st.write("- Eventos de fuerza mayor: Pandemias, guerras o desastres naturales que afecten significativamente las finanzas públicas.")
+st.write("- Crisis bancarias: Si es necesario capitalizar bancos, se permite aumentar la deuda por encima del objetivo.")
+
+st.subheader("Créditos")
+st.write("Desarrollado por Pablo Orazi")
