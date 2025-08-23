@@ -146,7 +146,7 @@ for i, v in enumerate(contribs["contribution_pctGDP"]):
 
 plt.xticks(rotation=0, ha="center", fontsize=8)
 # Ajustar los límites del eje y
-ax.set_ylim(bottoms[0], contribs["contribution_pctGDP"].max() + 0.3)
+ax.set_ylim(None, contribs["contribution_pctGDP"].max() + 0.3)
 plt.ylabel("Contribución (% del PIB)")
 plt.title("Descomposición del Balance Primario Objetivo")
 plt.tight_layout()
