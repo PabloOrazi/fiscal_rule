@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(layout="wide", page_title="Calculadora de Regla Fiscal")
 
 st.markdown("<h2 style='font-size:1.5em;'>Regla Fiscal — Descomposición del Balance Primario</h2>", unsafe_allow_html=True)
+st.markdown("<h3 style='font-size:1.2em;'>Autor: Pablo Orazi</h3>", unsafe_allow_html=True)
 
 # Entradas de la barra lateral
 st.sidebar.header("Entradas de Stock de Deuda")
